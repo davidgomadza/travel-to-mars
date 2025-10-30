@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>DavidGomadza — Gate to Mars (Interactive Vector)</title>
+<style>
+  :root{
+    --bg:#0b0f14;
+    --metal:#2c2f33;
+    --accent:#6ee7ff;
+    --mag:#a17cff;
+    --plate:#cbd5e1;
+    --danger:#ff6b6b;
+  }
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#041018 0%, #071223 60%);font-family:Inter,Segoe UI,Roboto,Arial,sans-serif;color:#e6eef6}
+  .wrap{display:flex;gap:20px;padding:20px;box-sizing:border-box;height:100%}
+  .canvas{flex:1;display:flex;align-items:center;justify-content:center}
+  .panel{width:360px;background:rgba(6,12,18,0.6);border-radius:12px;padding:14px;box-shadow:0 8px 30px rgba(0,0,0,0.6);backdrop-filter:blur(6px)}
+  h1{font-size:18px;margin:0 0 10px 0}
+  p.small{font-size:12px;color:#94a3b8;margin:6px 0}
+  button, input[type="text"]{font-size:14px;padding:8px;border-radius:8px;border:0;background:#0f1724;color:#e6eef6}
+  button{cursor:pointer}
+  .controls{display:grid;gap:8px}
+  .status{margin-top:10px;padding:10px;border-radius:8px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));font-size:13px}
+  .coords{font-family:monospace;font-size:11px;color:#a6b8d7;word-break:break-all}
+  /* SVG container */
+  svg{max-width:900px;width:86vmin;height:86vmin;display:block}
+  .gimbal{filter:drop-shadow(0 8px 18px rgba(0,0,0,0.6))}
+  .diamond{transform-origin:center; transition:transform 0.2s linear}
+  .diamond.spin{animation: diamondSpin 3s linear infinite}
+  @keyframes diamondSpin{from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+  .portal-shimmer{mix-blend-mode:screen;opacity:0;transition:opacity 600ms ease}
+  .portal-open .portal-shimmer{opacity:1; animation: swirl 2.5s linear infinite}
+  @keyframes swirl{
+    from{transform:rotate(0deg) translateZ(0)} to{transform:rotate(360deg) translateZ(0)}
+  }
+  .mag-field{opacity:0.0; transition:opacity 300ms ease}
+  .mag-on .mag-field{opacity:0.9}
+  .danger{color:var(--danger);font-weight:600}
+  .ok{color:var(--accent);font-weight:700}
+  .compass{font-size:12px;text-align:center;margin-top:8px}
+  .panel small{color:#90a4bf}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="canvas" role="main">
+    <!-- Interactive SVG Gate -->
+    <svg id="gateSVG" viewBox="-520 -520 1040 1040" xmlns="http://www.w3.org/2000/svg" aria-label="DavidGomadza Gate to Mars">
+      <defs>
+        <radialGradient id="portalGrad" cx="50%" cy="40%">
+          <stop offset="0%" stop-color="#121826" />
+          <stop offset="40%" stop-color="#0b1220" />
+          <stop offset="100%" stop-color="#000000" stop-opacity="0.95" />
+        </radialGradient>
+        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="6" result="b" />
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="10" stdDeviation="20" flood-color="#000" flood-opacity="0.55"/>
+        </filter>
+      </defs>
+
+      <!-- Outer base -->
+      <g transform="translate(0,220)">
+        <ellipse rx="330" ry="60" fill="rgba(0,0,0,0.5)"/>
+      </g>
+
+      <!-- Primary outer ring (gimbal container) -->
+      <g id="outerGimbal" class="gimbal">
+        <circle r="360" fill="none" stroke="#1f2530" stroke-width="28" />
+        <!-- energy conduits -->
+        <g id="conduits">
+          <path d="M-360 0 A360 360 0 0 1 360 0" fill="none" stroke="#0f2740" stroke-width="6" stroke-linecap="round" />
+        </g>
+      </g>
+
+      <!-- nested gimbals (visual) -->
+      <g id="gimbals" transform="scale(0.86)">
+        <g id="innerGimbal">
+          <circle r="260" fill="#11141a" stroke="#20242a" stroke-width="6" />
+          <circle r="200" fill="none" stroke="#23282e" stroke-width="10" />
+        </g>
+      </g>
+
+      <!-- North indicator (compass rose) -->
+      <g id="compass" transform="translate(0,-420)">
+        <g id="northArrow" transform="rotate(0)">
+          <path d="M0 0 L-10 -28 L10 -28 Z" fill="#e6faff"/>
+        </g>
+        <text x="0" y="-38" fill="#aee8ff" font-size="12" text-anchor="middle">N</text>
+      </g>
+
+      <!-- 84 diamonds on an internal North-facing ring -->
+      <g id="diamondRing" transform="rotate(0)">
+        <!-- diamonds inserted by JS for performance -->
+      </g>
+
+      <!-- Central circular hollow door (portal rim) -->
+      <g id="portal" class="">
+        <circle r="140" fill="url(#portalGrad)" stroke="#0b1b24" stroke-width="12" />
+        <!-- magnetic lining -->
+        <g id="magLining">
+          <circle r="142" fill="none" stroke="#7b5aff" stroke-width="8" stroke-dasharray="6 8" />
+          <circle r="155" fill="none" stroke="#4c2b88" stroke-width="3" opacity="0.6"/>
+        </g>
+        <!-- portal shimmer -->
+        <g class="portal-shimmer" id="portalShimmer">
+          <g transform="scale(1)">
+            <path d="M-80 0 A80 80 0 1 1 80 0 A80 80 0 1 1 -80 0" fill="none" stroke="#7dd3fc" stroke-width="3" opacity="0.45"/>
+          </g>
+        </g>
+        <!-- Mars Plate (traveler platform) -->
+        <g id="marsPlate" transform="translate(0,0)" style="cursor:pointer" role="button" aria-label="Mars Plate - Stand here">
+          <circle r="48" fill="#eef2f7" stroke="#bdc7d6" stroke-width="4" />
+          <circle r="36" fill="transparent" stroke="#91a7c1" stroke-width="2" />
+          <text x="0" y="6" fill="#102230" font-size="11" text-anchor="middle" font-weight="700">MARS PLATE</text>
+        </g>
+      </g>
+
+      <!-- South Entrance (aligned opposite north) -->
+      <g id="southEntrance" transform="translate(0,260)">
+        <ellipse rx="86" ry="40" fill="#07121a" stroke="#1c2b33" stroke-width="8"/>
+        <text x="0" y="6" fill="#9fbfdc" font-size="12" text-anchor="middle">SOUTH ENTRANCE</text>
+      </g>
+
+      <!-- magnetic field visual -->
+      <g id="magField" class="mag-field" transform="scale(1)">
+        <circle r="220" fill="none" stroke="#6b5cff" stroke-width="24" opacity="0.05" />
+        <circle r="300" fill="none" stroke="#6b5cff" stroke-width="6" opacity="0.03" />
+      </g>
+    </svg>
+  </div>
+
+  <aside class="panel" aria-label="Gate controls and status">
+    <h1>DavidGomadza — Gate to Mars (interactive)</h1>
+    <p class="small">This is a conceptual interactive vector simulation. It demonstrates rotation, magnetic-key authorization, diamond modulation, and portal activation. For demonstration only.</p>
+
+    <div class="controls">
+      <label><small>Rotate Gate (drag outer ring) — or use controls:</small></label>
+      <div style="display:flex;gap:8px">
+        <button id="btnRotateLeft">⟲ Rotate Left</button>
+        <button id="btnRotateRight">⟳ Rotate Right</button>
+        <button id="btnSnapNorth">📍 Snap to True North</button>
+      </div>
+
+      <label><small>Magnetic Key (present or insert):</small></label>
+      <input type="text" id="keyInput" placeholder="enter magnetic key signature or owner" value="" />
+      <div style="display:flex;gap:8px">
+        <button id="btnPresentKey">Present Key</button>
+        <button id="btnClearKey">Clear</button>
+      </div>
+
+      <label><small>Traveler actions:</small></label>
+      <div style="display:flex;gap:8px">
+        <button id="btnStand">Stand on Mars Plate (simulate)</button>
+        <button id="btnSayAGT">Say "agt"</button>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="btnOpenPortal">Attempt Open Portal</button>
+        <button id="btnEject">Eject (safety)</button>
+      </div>
+
+      <div class="status" aria-live="polite">
+        <div><strong>Gate ID:</strong> <span class="coords">00083678902848678908888888888888888888888888888888881</span></div>
+        <div style="margin-top:8px"><strong>Arrival destination code:</strong>
+          <div class="coords">000888888888888888886789028678902867890286789028678888888777666555444333222111000867810236782345678901</div>
+        </div>
+
+        <div id="authStatus" style="margin-top:10px"><strong>Status:</strong> <span id="statusText" class="ok">idle — awaiting key &amp; activation</span></div>
+
+        <div style="margin-top:8px"><small>Notes inside Gate (sanitized):</small>
+          <div class="coords" style="margin-top:6px">constructawayfromtherestrictedareacoordinates000038678902867890389028903890489058...</div>
+        </div>
+      </div>
+
+      <div class="compass"><small>Compass / Orientation: <span id="compHeading">0°</span></small></div>
+
+      <div style="margin-top:12px"><small>Accepted magnetic key signatures (demo):</small>
+        <div style="font-family:monospace;font-size:12px;color:#cfefff">
+          davidgomadza<br/>
+          ajudesign: <span style="opacity:0.9">ajuttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttjuer.start</span>
+        </div>
+      </div>
+
+      <small style="display:block;margin-top:10px;color:#98b4d0">This simulation enforces a strict auth check; incorrect keys cause instant field shutdown (visual).</small>
+    </div>
+  </aside>
+</div>
+
+<script>
+/* Gate interactive logic
+   - 84 diamonds created around a ring, pointing outwards
+   - rotation controls
+   - key authorization: accept ownerKey or longKey
+   - stand+say 'agt' triggers activation attempt
+*/
+(function(){
+  // SVG element refs
+  const svg = document.getElementById('gateSVG');
+  const outerGimbal = document.getElementById('outerGimbal');
+  const diamondRing = document.getElementById('diamondRing');
+  const marsPlate = document.getElementById('marsPlate');
+  const portal = document.getElementById('portal');
+  const portalShimmer = document.getElementById('portalShimmer');
+  const magField = document.getElementById('magField');
+  const statusText = document.getElementById('statusText');
+  const compHeading = document.getElementById('compHeading');
+  const northArrow = document.getElementById('northArrow');
+
+  // Authorization state
+  let ownerKey = 'davidgomadza';
+  let longKey = 'ajuttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttjuer.start';
+  let presentedKey = null;
+  let travelerStanding = false;
+  let travelerSaidAGT = false;
+  let portalOpen = false;
+  let orientationDeg = 0; // gate rotation in degrees
+
+  // Create 84 diamonds around a circle
+  const diamondsCount = 84;
+  const radius = 280;
+  for(let i=0;i<diamondsCount;i++){
+    const a = (i / diamondsCount) * Math.PI * 2 - Math.PI/2; // start at top (north)
+    const x = Math.cos(a) * (radius - 40);
+    const y = Math.sin(a) * (radius - 40);
+    const group = document.createElementNS('http://www.w3.org/2000/svg','g');
+    group.setAttribute('transform',`translate(${x},${y}) rotate(${(a*180/Math.PI)+90})`);
+    group.classList.add('diamond');
+    // diamond polygon (simple rhombus)
+    const poly = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+    const size = 12;
+    const pts = `0,-${size} ${size/2},0 0,${size} -${size/2},0`;
+    poly.setAttribute('points',pts);
+    poly.setAttribute('fill','#cfe9ff');
+    poly.setAttribute('stroke','#8fbfe0');
+    poly.setAttribute('stroke-width','0.8');
+    group.appendChild(poly);
+    diamondRing.appendChild(group);
+  }
+
+  // Helper update status
+  function setStatus(txt, cls){
+    statusText.textContent = txt;
+    statusText.className = cls || '';
+  }
+
+  // Magnetic key presentation simulation
+  document.getElementById('btnPresentKey').addEventListener('click',()=>{
+    const val = document.getElementById('keyInput').value.trim();
+    if(!val){ setStatus('no key presented', 'danger'); presentedKey = null; return; }
+    presentedKey = val;
+    if(presentedKey === ownerKey || presentedKey === longKey){
+      setStatus('authorized key detected — ready', 'ok');
+      portal.classList.add('mag-on');
+      document.getElementById('gateSVG').classList.add('mag-on');
+      magField.classList.add('mag-on');
+    } else {
+      // security field disruption
+      setStatus('unauthorized key — field disruption (shutdown)', 'danger');
+      portal.classList.remove('mag-on');
+      magField.classList.remove('mag-on');
+      // visual disruption: briefly flash diamonds and stop
+      flashDisruption();
+    }
+  });
+
+  document.getElementById('btnClearKey').addEventListener('click',()=>{
+    document.getElementById('keyInput').value = '';
+    presentedKey = null;
+    setStatus('key cleared — awaiting new key','');
+    portal.classList.remove('mag-on');
+    magField.classList.remove('mag-on');
+  });
+
+  // Stand simulation
+  document.getElementById('btnStand').addEventListener('click',()=>{
+    travelerStanding = true;
+    marsPlate.querySelector('circle').setAttribute('fill','#e6f7ff');
+    setStatus('traveller standing on Mars Plate — awaiting "agt"','ok');
+  });
+  marsPlate.addEventListener('click', ()=> {
+    // interactive: click to stand
+    travelerStanding = !travelerStanding;
+    if(travelerStanding){
+      marsPlate.querySelector('circle').setAttribute('fill','#e6f7ff');
+      setStatus('traveller standing on Mars Plate — awaiting "agt"','ok');
+    } else {
+      marsPlate.querySelector('circle').setAttribute('fill','#eef2f7');
+      setStatus('traveller stepped off plate','');
+    }
+  });
+
+  // Say "agt"
+  document.getElementById('btnSayAGT').addEventListener('click',()=>{
+    travelerSaidAGT = true;
+    setStatus('spoken "agt" detected — proceed with key auth & portal attempt','ok');
+  });
+
+  // Open portal attempt
+  document.getElementById('btnOpenPortal').addEventListener('click',()=>{
+    attemptOpenPortal();
+  });
+
+  // Eject (safety)
+  document.getElementById('btnEject').addEventListener('click',()=>{
+    portalOpen = false;
+    travelerStanding = false;
+    travelerSaidAGT = false;
+    portal.classList.remove('portal-open');
+    magField.classList.remove('mag-on');
+    document.querySelectorAll('.diamond').forEach(d=>d.classList.remove('spin'));
+    setStatus('EJECT: travellers removed, portal closed','danger');
+    marsPlate.querySelector('circle').setAttribute('fill','#eef2f7');
+  });
+
+  // attempt open portal logic
+  function attemptOpenPortal(){
+    if(!presentedKey || !(presentedKey === ownerKey || presentedKey === longKey)){
+      setStatus('Portal refused: correct magnetic key required','danger'); return;
+    }
+    if(!travelerStanding){
+      setStatus('Portal refused: no traveller on Mars Plate','danger'); return;
+    }
+    if(!travelerSaidAGT){
+      setStatus('Portal refused: activation word "agt" not detected','danger'); return;
+    }
+    // success sequence
+    setStatus('Authorization verified. Charging magnet — diamond ring engaging...', 'ok');
+    // show magnet on and diamonds spin
+    magField.classList.add('mag-on');
+    document.querySelectorAll('.diamond').forEach((d,i) => {
+      // stagger their spin slightly
+      setTimeout(()=> d.classList.add('spin'), i*8);
+    });
+    // open shimmer portal
+    setTimeout(()=> {
+      portal.classList.add('portal-open');
+      portalShimmer.classList.add('active');
+      setStatus('Portal open. Transit funnel stable. (Simulated) — standby for transit', 'ok');
+      portalOpen = true;
+    }, 900);
+  }
+
+  // Flash disruption animation when bad key
+  function flashDisruption(){
+    const rings = document.querySelectorAll('.diamond polygon');
+    rings.forEach((p,i)=>{
+      p.setAttribute('fill','#ffb3b3');
+      setTimeout(()=> p.setAttribute('fill','#cfe9ff'), 400 + i*4);
+    });
+  }
+
+  // Rotation controls
+  function setOrientation(deg){
+    orientationDeg = ((deg % 360)+360)%360;
+    diamondRing.setAttribute('transform',`rotate(${-orientationDeg})`); // keep ring facing north relative to world
+    outerGimbal.setAttribute('transform',`rotate(${orientationDeg})`);
+    compHeading.textContent = Math.round(orientationDeg) + '°';
+    northArrow.setAttribute('transform',`rotate(${ -orientationDeg })`);
+  }
+
+  document.getElementById('btnRotateLeft').addEventListener('click',()=>{
+    setOrientation(orientationDeg - 7);
+  });
+  document.getElementById('btnRotateRight').addEventListener('click',()=>{
+    setOrientation(orientationDeg + 7);
+  });
+  document.getElementById('btnSnapNorth').addEventListener('click',()=>{
+    setOrientation(0);
+    setStatus('Snapped to True North', 'ok');
+  });
+
+  // Drag-to-rotate implementation on outer ring
+  let dragging=false, lastAngle=0;
+  outerGimbal.style.cursor='grab';
+  outerGimbal.addEventListener('pointerdown', (ev)=>{
+    dragging=true;
+    outerGimbal.setPointerCapture(ev.pointerId);
+    outerGimbal.style.cursor='grabbing';
+  });
+  window.addEventListener('pointerup',(ev)=>{ dragging=false; outerGimbal.style.cursor='grab'; });
+  window.addEventListener('pointermove',(ev)=>{
+    if(!dragging) return;
+    // compute angle from svg center
+    const pt = svg.createSVGPoint();
+    pt.x = ev.clientX; pt.y = ev.clientY;
+    const ctm = svg.getScreenCTM().inverse();
+    const loc = pt.matrixTransform(ctm);
+    const ang = Math.atan2(loc.y, loc.x) * 180/Math.PI;
+    // first time
+    if(lastAngle === null){ lastAngle = ang; return; }
+    // compute delta
+    let delta = ang - lastAngle;
+    setOrientation(orientationDeg + delta);
+    lastAngle = ang;
+  });
+
+  // ensure lastAngle resets on pointerdown with computed current angle
+  outerGimbal.addEventListener('pointerdown', (ev)=>{
+    const pt = svg.createSVGPoint();
+    pt.x = ev.clientX; pt.y = ev.clientY;
+    const ctm = svg.getScreenCTM().inverse();
+    const loc = pt.matrixTransform(ctm);
+    lastAngle = Math.atan2(loc.y, loc.x) * 180/Math.PI;
+  });
+
+  // small accessibility: pressing Enter on key input presents it
+  document.getElementById('keyInput').addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter'){ document.getElementById('btnPresentKey').click(); }
+  });
+
+  // Connect clickable marsPlate to standing action
+  marsPlate.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') marsPlate.click(); });
+
+  // hand-off: if portal open for long time, simulate automated safety eject after set time (demo 20s)
+  setInterval(()=>{
+    if(portalOpen){
+      // keep portal until manually ejected; do nothing here for demo
+    }
+  }, 5000);
+
+  // initialize orientation to 0
+  setOrientation(0);
+
+  // expose some debug controls to console (for advanced tinkering)
+  window.GATE = {
+    setOrientation, attemptOpenPortal,
+    get state(){ return {presentedKey,travelerStanding,travelerSaidAGT,portalOpen,orientationDeg}; }
+  };
+
+})();
+</script>
+</body>
+</html>
